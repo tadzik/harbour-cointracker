@@ -14,6 +14,10 @@ class Cointracker {
     symbol_map: any
     coin_update_cb: Function = () => {}
 
+    requests_completed: number
+    requests_total: number
+    update_progress_cb: Function = () => {}
+
     constructor() {
         this.dbh = LocalStorage.openDatabaseSync(
             "cointrackerdb", "0.1", "database of cryptocoin prices", 1000, this.dbconfig
@@ -44,6 +48,8 @@ class Cointracker {
     update_coins() : void {
         this.dbh.transaction((tx) => {
             var rs = tx.executeSql('SELECT cmc_id FROM coins WHERE tracked = 1')
+            this.requests_completed = 0
+            this.requests_total     = rs.rows.length
             for (var i = 0; i < rs.rows.length; i++) {
                 this.update_coin(rs.rows.item(i).cmc_id)
             }
@@ -73,6 +79,7 @@ class Cointracker {
                 tx.executeSql('INSERT INTO prices VALUES (?, ?, ?)', [symbol, price_usd, last_updated])
             }
         })
+        this.requests_completed++
         this.coin_update_cb()
     }
 
@@ -81,7 +88,7 @@ class Cointracker {
         this.dbh.transaction((tx) => {
             var rs = tx.executeSql('select c.symbol, c.cmc_id, p.price_usd \
                                    from prices p \
-                                   join coins c on c.symbol = p.symbol \
+                                   left join coins c on c.symbol = p.symbol \
                                    where c.tracked = 1 \
                                    group by p.symbol \
                                    order by p.symbol, update_time desc \

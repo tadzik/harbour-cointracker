@@ -36,9 +36,9 @@ Page {
     id: page
     allowedOrientations: Orientation.All
 
-    SilicaListView {
+    SilicaFlickable {
         anchors.fill: parent
-
+        contentHeight: column.height
 
         PullDownMenu {
             MenuItem {
@@ -47,45 +47,66 @@ Page {
             }
             MenuItem {
                 text: qsTr("Refresh")
-                onClicked: app.cointracker.update_coins()
+                onClicked: {
+                    trigger_update()
+                }
             }
         }
 
-        header: PageHeader {
-            title: qsTr("Cointracker")
-        }
+        Column {
+            id: column
+            anchors.fill: parent
 
-        model: ListModel {
-            id: coinListModel
-        }
-
-        delegate: BackgroundItem {
-            x: Theme.horizontalPageMargin
-            width: parent.width - Theme.horizontalPageMargin
-            height: Theme.itemSizeSmall
-
-            Label {
-                text: symbol
-                font.pixelSize: Theme.fontSizeHuge
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
+            PageHeader {
+                id: header
+                title: qsTr("Cointracker")
             }
 
-            Label {
-                text: fullname
-                font.pixelSize: Theme.fontSizeSmall
-                x: parent.width / 4
-                anchors.verticalCenter: parent.verticalCenter
+            SilicaListView {
+                id: listview
+                width: parent.width
+
+                model: ListModel {
+                    id: coinListModel
+                }
+
+                delegate: BackgroundItem {
+                    x: Theme.horizontalPageMargin
+                    width: parent.width - Theme.horizontalPageMargin
+                    height: Theme.itemSizeSmall
+
+                    Label {
+                        text: symbol
+                        font.pixelSize: Theme.fontSizeHuge
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Label {
+                        text: fullname
+                        font.pixelSize: Theme.fontSizeSmall
+                        x: parent.width / 4
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Label {
+                        text: "$" + price_usd
+                        font.pixelSize: Theme.fontSizeLarge
+                        x: parent.width * 7/10
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
             }
 
-            Label {
-                text: "$" + price_usd
-                font.pixelSize: Theme.fontSizeLarge
-                x: parent.width * 7/10
-                anchors.verticalCenter: parent.verticalCenter
+            ProgressBar {
+                id: progressbar
+                width: parent.width
+                label: "Updating " + value + "/" + maximumValue
+                visible: true
             }
         }
     }
+
 
     function update_view() {
         var coins = app.cointracker.get_coin_data()
@@ -97,10 +118,23 @@ Page {
                 price_usd: coins[i].price_usd,
             })
         }
+        listview.height = coins.length * Theme.itemSizeSmall
+
+        progressbar.value = app.cointracker.requests_completed
+        if (app.cointracker.requests_completed === app.cointracker.requests_total) {
+            progressbar.visible = false
+        }
+    }
+
+    function trigger_update() {
+        app.cointracker.update_coins()
+        progressbar.visible = true
+        progressbar.maximumValue = app.cointracker.requests_total
+        progressbar.value = app.cointracker.requests_completed
     }
 
     Component.onCompleted: {
         app.cointracker.coin_update_cb = update_view
-        app.cointracker.update_coins()
+        trigger_update()
     }
 }
